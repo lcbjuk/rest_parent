@@ -14,21 +14,24 @@ app.use(express.json());
 //   IN-MEMORY STORE (resets on restart)
 // ==========================================
 const parents = [
-  { parentId: 1, driver: 'D-1001', name: 'Alice Johnson', profession: 'Engineer' },
-  { parentId: 2, driver: 'D-1002', name: 'Bob Smith', profession: 'Teacher' },
-  { parentId: 3, driver: 'D-1003', name: 'Carol White', profession: 'Doctor' },
-  { parentId: 4, driver: 'D-1004', name: 'David Brown', profession: 'Designer' },
-  { parentId: 5, driver: 'D-1005', name: 'Eva Martinez', profession: 'Accountant' },
-  { parentId: 6, driver: 'D-1006', name: 'Frank Lee', profession: 'Architect' },
+  { parentId: 1, name: 'Alice Johnson', profession: 'Nurse',      driver: true },
+  { parentId: 2, name: 'Bob Smith',     profession: 'Engineer',   driver: false },
+  { parentId: 3, name: 'Carol White',   profession: 'Teacher',    driver: true },
+  { parentId: 4, name: 'David Brown',   profession: 'Accountant', driver: true },
+  { parentId: 5, name: 'Eva Martinez',  profession: 'Architect',  driver: false },
+  { parentId: 6, name: 'Frank Lee',     profession: 'Chef',       driver: true },
 ];
 
 const children = [
-  { childId: 1, name: 'Jamie Johnson', school: 'North School', course: 'Grade 4' },
-  { childId: 2, name: 'Taylor Smith', school: 'Central School', course: 'Grade 5' },
-  { childId: 3, name: 'Morgan White', school: 'West School', course: 'Grade 3' },
+  { childId: 1, name: 'Emma Johnson-Smith', school: 'Lincoln Elementary', course: 'Grade 3' },
+  { childId: 2, name: 'Liam White-Brown',   school: 'Roosevelt Middle',   course: 'Grade 7' },
+  { childId: 3, name: 'Mia Martinez-Lee',   school: 'Central High',       course: 'Biology' },
 ];
 
-// Two parents are associated with each sample child.
+// parent_children: 2 parents per child
+// Child 1 -> Alice (1), Bob (2)
+// Child 2 -> Carol (3), David (4)
+// Child 3 -> Eva (5), Frank (6)
 let parentChildren = [
   { parentId: 1, childId: 1 },
   { parentId: 2, childId: 1 },
@@ -41,8 +44,8 @@ let parentChildren = [
 let nextParentId = 7;
 let nextChildId = 4;
 
-const findParent = (id) => parents.find((parent) => parent.parentId === id);
-const findChild = (id) => children.find((p) => p.childId === id);
+const findParent = (id) => parents.find((p) => p.parentId === id);
+const findChild = (id) => children.find((c) => c.childId === id);
 
 function link(parentId, childId) {
   const exists = parentChildren.some(
@@ -64,20 +67,20 @@ const swaggerOptions = {
   definition: {
     openapi: '3.0.0',
     info: {
-      title: 'Parent/Child API',
+      title: 'ACME Parent/Child API',
       version: '1.0.0',
       description: 'Express in-memory version of the ACME REST API'
     },
-    servers: [{ url: 'http://localhost:3000' }],
+    servers: [{ url: 'https://rest-papers.onrender.com' }],
     components: {
       schemas: {
         Parent: {
           type: 'object',
           properties: {
             parentId: { type: 'integer' },
-            driver: { type: 'string' },
             name: { type: 'string' },
-            profession: { type: 'string' }
+            profession: { type: 'string' },
+            driver: { type: 'boolean' }
           }
         },
         Child: {
@@ -99,17 +102,17 @@ const swaggerSpec = swaggerJSDoc(swaggerOptions);
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
 // ==========================================
-//           parent ENDPOINTS
+//           PARENT ENDPOINTS
 // ==========================================
-// Note: fixed paths (/count, /is-registered) are registered before
+// Note: fixed paths (/count, /is-registered, /drivers) are registered before
 // /parents/:parentId so they are not captured by the parameter route.
 
 /**
  * @swagger
  * /parents/count:
  *   get:
- *     summary: Count parents
- *     tags: [parents]
+ *     summary: Count Parents
+ *     tags: [Parents]
  *     responses:
  *       200:
  *         description: Number of parents
@@ -122,11 +125,11 @@ app.get('/parents/count', (req, res) => {
  * @swagger
  * /parents/is-registered:
  *   get:
- *     summary: Check if parent driver is registered
- *     tags: [parents]
+ *     summary: Check if Parent name is registered
+ *     tags: [Parents]
  *     parameters:
  *       - in: query
- *         name: driver
+ *         name: name
  *         schema:
  *           type: string
  *         required: true
@@ -135,16 +138,33 @@ app.get('/parents/count', (req, res) => {
  *         description: Boolean result
  */
 app.get('/parents/is-registered', (req, res) => {
-  const { driver } = req.query;
-  res.status(200).json(parents.some((a) => a.driver === driver));
+  const { name } = req.query;
+  res.status(200).json(parents.some((p) => p.name === name));
+});
+
+/**
+ * @swagger
+ * /parents/drivers:
+ *   get:
+ *     summary: Get all Parents who are drivers, ordered by name
+ *     tags: [Parents]
+ *     responses:
+ *       200:
+ *         description: List of driver parents
+ */
+app.get('/parents/drivers', (req, res) => {
+  const drivers = parents
+    .filter((p) => p.driver)
+    .sort((a, b) => a.name.localeCompare(b.name));
+  res.status(200).json(drivers);
 });
 
 /**
  * @swagger
  * /parents:
  *   post:
- *     summary: Add a new parent
- *     tags: [parents]
+ *     summary: Add a new Parent
+ *     tags: [Parents]
  *     requestBody:
  *       required: true
  *       content:
@@ -153,21 +173,26 @@ app.get('/parents/is-registered', (req, res) => {
  *             $ref: '#/components/schemas/Parent'
  *     responses:
  *       201:
- *         description: parent created
+ *         description: Parent created
  *       400:
- *         description: parent already registered
+ *         description: Parent already registered
  */
 app.post('/parents', (req, res) => {
-  const { driver, name, profession } = req.body;
+  const { name, profession, driver } = req.body;
 
-  if (!driver || !name || !profession) {
-    return res.status(400).send('driver, name and profession are required.');
+  if (!name) {
+    return res.status(400).send('name is required.');
   }
-  if (parents.some((a) => a.driver === driver)) {
-    return res.status(400).send(`parent with driver ${driver} is already registered.`);
+  if (parents.some((p) => p.name === name)) {
+    return res.status(400).send(`Parent ${name} is already registered.`);
   }
 
-  parents.push({ parentId: nextParentId++, driver, name, profession });
+  parents.push({
+    parentId: nextParentId++,
+    name,
+    profession: profession ?? null,
+    driver: Boolean(driver)
+  });
   res.status(201).end();
 });
 
@@ -175,8 +200,8 @@ app.post('/parents', (req, res) => {
  * @swagger
  * /parents/{parentId}:
  *   put:
- *     summary: Update an existing parent
- *     tags: [parents]
+ *     summary: Update an existing Parent
+ *     tags: [Parents]
  *     parameters:
  *       - in: path
  *         name: parentId
@@ -191,30 +216,27 @@ app.post('/parents', (req, res) => {
  *             $ref: '#/components/schemas/Parent'
  *     responses:
  *       200:
- *         description: parent updated
+ *         description: Parent updated
  *       400:
  *         description: Bad request
  */
 app.put('/parents/:parentId', (req, res) => {
   const parentId = parseInt(req.params.parentId, 10);
-  const { parentId: bodyId, driver, name, profession } = req.body;
+  const { parentId: bodyId, name, profession, driver } = req.body;
 
-  if (!driver || !name || !profession) {
-    return res.status(400).send('driver, name and profession are required.');
-  }
   if (bodyId !== parentId) {
     return res.status(400).send('Path ID and Body ID do not match.');
   }
-  if (parents.some((a) => a.driver === driver && a.parentId !== parentId)) {
-    return res.status(400).send('Driver already in use by another parent.');
+  if (parents.some((p) => p.name === name && p.parentId !== parentId)) {
+    return res.status(400).send('Name already in use by another parent.');
   }
 
   const parent = findParent(parentId);
-  if (!parent) return res.status(400).send('parent ID not found.');
+  if (!parent) return res.status(400).send('Parent ID not found.');
 
   parent.name = name;
-  parent.driver = driver;
   parent.profession = profession;
+  parent.driver = Boolean(driver);
   res.status(200).end();
 });
 
@@ -222,8 +244,8 @@ app.put('/parents/:parentId', (req, res) => {
  * @swagger
  * /parents/{parentId}:
  *   delete:
- *     summary: Delete an parent
- *     tags: [parents]
+ *     summary: Delete a Parent
+ *     tags: [Parents]
  *     parameters:
  *       - in: path
  *         name: parentId
@@ -236,7 +258,7 @@ app.put('/parents/:parentId', (req, res) => {
  */
 app.delete('/parents/:parentId', (req, res) => {
   const parentId = parseInt(req.params.parentId, 10);
-  const idx = parents.findIndex((a) => a.parentId === parentId);
+  const idx = parents.findIndex((p) => p.parentId === parentId);
   if (idx !== -1) parents.splice(idx, 1);
   parentChildren = parentChildren.filter((l) => l.parentId !== parentId);
   res.status(204).end();
@@ -246,8 +268,8 @@ app.delete('/parents/:parentId', (req, res) => {
  * @swagger
  * /parents/{parentId}:
  *   get:
- *     summary: Get an parent by ID (includes their children)
- *     tags: [parents]
+ *     summary: Get a Parent by ID (includes their children)
+ *     tags: [Parents]
  *     parameters:
  *       - in: path
  *         name: parentId
@@ -256,29 +278,29 @@ app.delete('/parents/:parentId', (req, res) => {
  *           type: integer
  *     responses:
  *       200:
- *         description: parent found
+ *         description: Parent found
  *       404:
- *         description: parent not found
+ *         description: Parent not found
  */
 app.get('/parents/:parentId', (req, res) => {
   const parentId = parseInt(req.params.parentId, 10);
   const parent = findParent(parentId);
   if (!parent) return res.status(404).end();
 
-  const parentchildList = parentChildren
+  const parentChildList = parentChildren
     .filter((l) => l.parentId === parentId)
     .map((l) => findChild(l.childId))
     .filter(Boolean);
 
-  res.status(200).json({ ...parent, children: parentchildList });
+  res.status(200).json({ ...parent, children: parentChildList });
 });
 
 /**
  * @swagger
  * /parents:
  *   get:
- *     summary: Get all parents ordered by name
- *     tags: [parents]
+ *     summary: Get all Parents ordered by name
+ *     tags: [Parents]
  *     responses:
  *       200:
  *         description: List of parents
@@ -289,15 +311,15 @@ app.get('/parents', (req, res) => {
 });
 
 // ==========================================
-//           child ENDPOINTS
+//           CHILD ENDPOINTS
 // ==========================================
 
 /**
  * @swagger
  * /children/count:
  *   get:
- *     summary: Count children
- *     tags: [children]
+ *     summary: Count Children
+ *     tags: [Children]
  *     responses:
  *       200:
  *         description: Number of children
@@ -308,11 +330,31 @@ app.get('/children/count', (req, res) => {
 
 /**
  * @swagger
+ * /children/is-registered:
+ *   get:
+ *     summary: Check if Child name is registered
+ *     tags: [Children]
+ *     parameters:
+ *       - in: query
+ *         name: name
+ *         schema:
+ *           type: string
+ *         required: true
+ *     responses:
+ *       200:
+ *         description: Boolean result
+ */
+app.get('/children/is-registered', (req, res) => {
+  const { name } = req.query;
+  res.status(200).json(children.some((c) => c.name === name));
+});
+
+/**
  * @swagger
  * /children:
  *   post:
- *     summary: Add a new child
- *     tags: [children]
+ *     summary: Add a new Child
+ *     tags: [Children]
  *     requestBody:
  *       required: true
  *       content:
@@ -321,18 +363,21 @@ app.get('/children/count', (req, res) => {
  *             $ref: '#/components/schemas/Child'
  *     responses:
  *       201:
- *         description: child created
+ *         description: Child created
  *       400:
- *         description: Invalid child data
+ *         description: Child already registered
  */
 app.post('/children', (req, res) => {
-  const { school, name, course } = req.body;
+  const { name, school, course } = req.body;
 
-  if (!name || !school || !course) {
-    return res.status(400).send('name, school and course are required.');
+  if (!name || !school) {
+    return res.status(400).send('name and school are required.');
+  }
+  if (children.some((c) => c.name === name)) {
+    return res.status(400).send(`Child ${name} is already registered.`);
   }
 
-  children.push({ childId: nextChildId++, name, school, course });
+  children.push({ childId: nextChildId++, name, school, course: course ?? null });
   res.status(201).end();
 });
 
@@ -340,8 +385,8 @@ app.post('/children', (req, res) => {
  * @swagger
  * /children/{childId}:
  *   put:
- *     summary: Update an existing child
- *     tags: [children]
+ *     summary: Update an existing Child
+ *     tags: [Children]
  *     parameters:
  *       - in: path
  *         name: childId
@@ -356,25 +401,26 @@ app.post('/children', (req, res) => {
  *             $ref: '#/components/schemas/Child'
  *     responses:
  *       200:
- *         description: child updated
+ *         description: Child updated
  *       400:
  *         description: Bad request
  */
 app.put('/children/:childId', (req, res) => {
   const childId = parseInt(req.params.childId, 10);
-  const { childId: bodyId, school, name, course } = req.body;
+  const { childId: bodyId, name, school, course } = req.body;
 
-  if (!name || !school || !course) {
-    return res.status(400).send('name, school and course are required.');
-  }
   if (bodyId !== childId) {
     return res.status(400).send('Path ID and Body ID do not match.');
   }
-  const child = findChild(childId);
-  if (!child) return res.status(400).send('child ID not found.');
+  if (children.some((c) => c.name === name && c.childId !== childId)) {
+    return res.status(400).send('Name already in use by another child.');
+  }
 
-  child.school = school;
+  const child = findChild(childId);
+  if (!child) return res.status(400).send('Child ID not found.');
+
   child.name = name;
+  child.school = school;
   child.course = course;
   res.status(200).end();
 });
@@ -383,8 +429,8 @@ app.put('/children/:childId', (req, res) => {
  * @swagger
  * /children/{childId}:
  *   delete:
- *     summary: Delete a child
- *     tags: [children]
+ *     summary: Delete a Child
+ *     tags: [Children]
  *     parameters:
  *       - in: path
  *         name: childId
@@ -397,7 +443,7 @@ app.put('/children/:childId', (req, res) => {
  */
 app.delete('/children/:childId', (req, res) => {
   const childId = parseInt(req.params.childId, 10);
-  const idx = children.findIndex((p) => p.childId === childId);
+  const idx = children.findIndex((c) => c.childId === childId);
   if (idx !== -1) children.splice(idx, 1);
   parentChildren = parentChildren.filter((l) => l.childId !== childId);
   res.status(204).end();
@@ -407,8 +453,8 @@ app.delete('/children/:childId', (req, res) => {
  * @swagger
  * /children/{childId}:
  *   get:
- *     summary: Get a child by ID (includes its parents)
- *     tags: [children]
+ *     summary: Get a Child by ID (includes their parents)
+ *     tags: [Children]
  *     parameters:
  *       - in: path
  *         name: childId
@@ -417,29 +463,29 @@ app.delete('/children/:childId', (req, res) => {
  *           type: integer
  *     responses:
  *       200:
- *         description: child found
+ *         description: Child found
  *       404:
- *         description: child not found
+ *         description: Child not found
  */
 app.get('/children/:childId', (req, res) => {
   const childId = parseInt(req.params.childId, 10);
   const child = findChild(childId);
   if (!child) return res.status(404).end();
 
-  const childparents = parentChildren
+  const childParents = parentChildren
     .filter((l) => l.childId === childId)
     .map((l) => findParent(l.parentId))
     .filter(Boolean);
 
-  res.status(200).json({ ...child, parents: childparents });
+  res.status(200).json({ ...child, parents: childParents });
 });
 
 /**
  * @swagger
  * /children:
  *   get:
- *     summary: Get all children ordered by name
- *     tags: [children]
+ *     summary: Get all Children ordered by name
+ *     tags: [Children]
  *     responses:
  *       200:
  *         description: List of children
@@ -450,14 +496,14 @@ app.get('/children', (req, res) => {
 });
 
 // ==========================================
-//   LINK / UNLINK parent <-> child
+//   LINK / UNLINK PARENT <-> CHILD
 // ==========================================
 
 function handleLink(req, res) {
   const parentId = parseInt(req.params.parentId, 10);
   const childId = parseInt(req.params.childId, 10);
   if (!findParent(parentId) || !findChild(childId)) {
-    return res.status(404).send('parent or child not found.');
+    return res.status(404).send('Parent or Child not found.');
   }
   link(parentId, childId);
   res.status(204).end();
@@ -474,7 +520,7 @@ function handleUnlink(req, res) {
  * @swagger
  * /parents/{parentId}/children/{childId}:
  *   put:
- *     summary: Link child to parent
+ *     summary: Link Child to Parent
  *     tags: [Links]
  *     parameters:
  *       - in: path
@@ -491,9 +537,9 @@ function handleUnlink(req, res) {
  *       204:
  *         description: Linked
  *       404:
- *         description: parent or child not found
+ *         description: Parent or Child not found
  *   delete:
- *     summary: Unlink child from parent
+ *     summary: Unlink Child from Parent
  *     tags: [Links]
  *     parameters:
  *       - in: path
@@ -517,7 +563,7 @@ app.delete('/parents/:parentId/children/:childId', handleUnlink);
  * @swagger
  * /children/{childId}/parents/{parentId}:
  *   put:
- *     summary: Link parent to child
+ *     summary: Link Parent to Child
  *     tags: [Links]
  *     parameters:
  *       - in: path
@@ -534,9 +580,9 @@ app.delete('/parents/:parentId/children/:childId', handleUnlink);
  *       204:
  *         description: Linked
  *       404:
- *         description: parent or child not found
+ *         description: Parent or Child not found
  *   delete:
- *     summary: Unlink parent from child
+ *     summary: Unlink Parent from Child
  *     tags: [Links]
  *     parameters:
  *       - in: path
