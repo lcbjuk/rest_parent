@@ -13,50 +13,47 @@ app.use(express.json());
 // ==========================================
 //   IN-MEMORY STORE (resets on restart)
 // ==========================================
-const authors = [
-  { authorId: 1, name: 'Alice Johnson', email: 'alice@acme.com' },
-  { authorId: 2, name: 'Bob Smith',     email: 'bob@acme.com' },
-  { authorId: 3, name: 'Carol White',   email: 'carol@acme.com' },
-  { authorId: 4, name: 'David Brown',   email: 'david@acme.com' },
-  { authorId: 5, name: 'Eva Martinez',  email: 'eva@acme.com' },
-  { authorId: 6, name: 'Frank Lee',     email: 'frank@acme.com' },
+const parents = [
+  { parentId: 1, driver: 'D-1001', name: 'Alice Johnson', profession: 'Engineer' },
+  { parentId: 2, driver: 'D-1002', name: 'Bob Smith', profession: 'Teacher' },
+  { parentId: 3, driver: 'D-1003', name: 'Carol White', profession: 'Doctor' },
+  { parentId: 4, driver: 'D-1004', name: 'David Brown', profession: 'Designer' },
+  { parentId: 5, driver: 'D-1005', name: 'Eva Martinez', profession: 'Accountant' },
+  { parentId: 6, driver: 'D-1006', name: 'Frank Lee', profession: 'Architect' },
 ];
 
-const papers = [
-  { paperId: 1, entryId: 'arxiv-001', title: 'Deep Learning Fundamentals',        abstract: 'An overview of deep learning techniques.' },
-  { paperId: 2, entryId: 'arxiv-002', title: 'Quantum Computing Advances',        abstract: 'Recent progress in quantum hardware and algorithms.' },
-  { paperId: 3, entryId: 'arxiv-003', title: 'Climate Modeling with Neural Nets', abstract: 'Applying ML to climate prediction models.' },
+const children = [
+  { childId: 1, name: 'Jamie Johnson', school: 'North School', course: 'Grade 4' },
+  { childId: 2, name: 'Taylor Smith', school: 'Central School', course: 'Grade 5' },
+  { childId: 3, name: 'Morgan White', school: 'West School', course: 'Grade 3' },
 ];
 
-// author_papers: 2 authors per paper
-// Paper 1 -> Alice (1), Bob (2)
-// Paper 2 -> Carol (3), David (4)
-// Paper 3 -> Eva (5), Frank (6)
-let authorPapers = [
-  { authorId: 1, paperId: 1 },
-  { authorId: 2, paperId: 1 },
-  { authorId: 3, paperId: 2 },
-  { authorId: 4, paperId: 2 },
-  { authorId: 5, paperId: 3 },
-  { authorId: 6, paperId: 3 },
+// Two parents are associated with each sample child.
+let parentChildren = [
+  { parentId: 1, childId: 1 },
+  { parentId: 2, childId: 1 },
+  { parentId: 3, childId: 2 },
+  { parentId: 4, childId: 2 },
+  { parentId: 5, childId: 3 },
+  { parentId: 6, childId: 3 },
 ];
 
-let nextAuthorId = 7;
-let nextPaperId = 4;
+let nextParentId = 7;
+let nextChildId = 4;
 
-const findAuthor = (id) => authors.find((a) => a.authorId === id);
-const findPaper = (id) => papers.find((p) => p.paperId === id);
+const findParent = (id) => parents.find((parent) => parent.parentId === id);
+const findChild = (id) => children.find((p) => p.childId === id);
 
-function link(authorId, paperId) {
-  const exists = authorPapers.some(
-    (l) => l.authorId === authorId && l.paperId === paperId
+function link(parentId, childId) {
+  const exists = parentChildren.some(
+    (l) => l.parentId === parentId && l.childId === childId
   );
-  if (!exists) authorPapers.push({ authorId, paperId });
+  if (!exists) parentChildren.push({ parentId, childId });
 }
 
-function unlink(authorId, paperId) {
-  authorPapers = authorPapers.filter(
-    (l) => !(l.authorId === authorId && l.paperId === paperId)
+function unlink(parentId, childId) {
+  parentChildren = parentChildren.filter(
+    (l) => !(l.parentId === parentId && l.childId === childId)
   );
 }
 
@@ -67,28 +64,29 @@ const swaggerOptions = {
   definition: {
     openapi: '3.0.0',
     info: {
-      title: 'ACME Author/Paper API',
+      title: 'Parent/Child API',
       version: '1.0.0',
       description: 'Express in-memory version of the ACME REST API'
     },
-    servers: [{ url: 'https://rest-papers.onrender.com' }],
+    servers: [{ url: 'http://localhost:3000' }],
     components: {
       schemas: {
-        Author: {
+        Parent: {
           type: 'object',
           properties: {
-            authorId: { type: 'integer' },
+            parentId: { type: 'integer' },
+            driver: { type: 'string' },
             name: { type: 'string' },
-            email: { type: 'string' }
+            profession: { type: 'string' }
           }
         },
-        Paper: {
+        Child: {
           type: 'object',
           properties: {
-            paperId: { type: 'integer' },
-            entryId: { type: 'string' },
-            title: { type: 'string' },
-            abstract: { type: 'string' }
+            childId: { type: 'integer' },
+            name: { type: 'string' },
+            school: { type: 'string' },
+            course: { type: 'string' }
           }
         }
       }
@@ -101,34 +99,34 @@ const swaggerSpec = swaggerJSDoc(swaggerOptions);
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
 // ==========================================
-//           AUTHOR ENDPOINTS
+//           parent ENDPOINTS
 // ==========================================
 // Note: fixed paths (/count, /is-registered) are registered before
-// /authors/:authorId so they are not captured by the parameter route.
+// /parents/:parentId so they are not captured by the parameter route.
 
 /**
  * @swagger
- * /authors/count:
+ * /parents/count:
  *   get:
- *     summary: Count Authors
- *     tags: [Authors]
+ *     summary: Count parents
+ *     tags: [parents]
  *     responses:
  *       200:
- *         description: Number of authors
+ *         description: Number of parents
  */
-app.get('/authors/count', (req, res) => {
-  res.status(200).json(authors.length);
+app.get('/parents/count', (req, res) => {
+  res.status(200).json(parents.length);
 });
 
 /**
  * @swagger
- * /authors/is-registered:
+ * /parents/is-registered:
  *   get:
- *     summary: Check if Author email is registered
- *     tags: [Authors]
+ *     summary: Check if parent driver is registered
+ *     tags: [parents]
  *     parameters:
  *       - in: query
- *         name: email
+ *         name: driver
  *         schema:
  *           type: string
  *         required: true
@@ -136,52 +134,52 @@ app.get('/authors/count', (req, res) => {
  *       200:
  *         description: Boolean result
  */
-app.get('/authors/is-registered', (req, res) => {
-  const { email } = req.query;
-  res.status(200).json(authors.some((a) => a.email === email));
+app.get('/parents/is-registered', (req, res) => {
+  const { driver } = req.query;
+  res.status(200).json(parents.some((a) => a.driver === driver));
 });
 
 /**
  * @swagger
- * /authors:
+ * /parents:
  *   post:
- *     summary: Add a new Author
- *     tags: [Authors]
+ *     summary: Add a new parent
+ *     tags: [parents]
  *     requestBody:
  *       required: true
  *       content:
  *         application/json:
  *           schema:
- *             $ref: '#/components/schemas/Author'
+ *             $ref: '#/components/schemas/Parent'
  *     responses:
  *       201:
- *         description: Author created
+ *         description: parent created
  *       400:
- *         description: Author already registered
+ *         description: parent already registered
  */
-app.post('/authors', (req, res) => {
-  const { name, email } = req.body;
+app.post('/parents', (req, res) => {
+  const { driver, name, profession } = req.body;
 
-  if (!name || !email) {
-    return res.status(400).send('name and email are required.');
+  if (!driver || !name || !profession) {
+    return res.status(400).send('driver, name and profession are required.');
   }
-  if (authors.some((a) => a.email === email)) {
-    return res.status(400).send(`Author with email ${email} is already registered.`);
+  if (parents.some((a) => a.driver === driver)) {
+    return res.status(400).send(`parent with driver ${driver} is already registered.`);
   }
 
-  authors.push({ authorId: nextAuthorId++, name, email });
+  parents.push({ parentId: nextParentId++, driver, name, profession });
   res.status(201).end();
 });
 
 /**
  * @swagger
- * /authors/{authorId}:
+ * /parents/{parentId}:
  *   put:
- *     summary: Update an existing Author
- *     tags: [Authors]
+ *     summary: Update an existing parent
+ *     tags: [parents]
  *     parameters:
  *       - in: path
- *         name: authorId
+ *         name: parentId
  *         required: true
  *         schema:
  *           type: integer
@@ -190,41 +188,45 @@ app.post('/authors', (req, res) => {
  *       content:
  *         application/json:
  *           schema:
- *             $ref: '#/components/schemas/Author'
+ *             $ref: '#/components/schemas/Parent'
  *     responses:
  *       200:
- *         description: Author updated
+ *         description: parent updated
  *       400:
  *         description: Bad request
  */
-app.put('/authors/:authorId', (req, res) => {
-  const authorId = parseInt(req.params.authorId, 10);
-  const { authorId: bodyId, name, email } = req.body;
+app.put('/parents/:parentId', (req, res) => {
+  const parentId = parseInt(req.params.parentId, 10);
+  const { parentId: bodyId, driver, name, profession } = req.body;
 
-  if (bodyId !== authorId) {
+  if (!driver || !name || !profession) {
+    return res.status(400).send('driver, name and profession are required.');
+  }
+  if (bodyId !== parentId) {
     return res.status(400).send('Path ID and Body ID do not match.');
   }
-  if (authors.some((a) => a.email === email && a.authorId !== authorId)) {
-    return res.status(400).send('Email already in use by another author.');
+  if (parents.some((a) => a.driver === driver && a.parentId !== parentId)) {
+    return res.status(400).send('Driver already in use by another parent.');
   }
 
-  const author = findAuthor(authorId);
-  if (!author) return res.status(400).send('Author ID not found.');
+  const parent = findParent(parentId);
+  if (!parent) return res.status(400).send('parent ID not found.');
 
-  author.name = name;
-  author.email = email;
+  parent.name = name;
+  parent.driver = driver;
+  parent.profession = profession;
   res.status(200).end();
 });
 
 /**
  * @swagger
- * /authors/{authorId}:
+ * /parents/{parentId}:
  *   delete:
- *     summary: Delete an Author
- *     tags: [Authors]
+ *     summary: Delete an parent
+ *     tags: [parents]
  *     parameters:
  *       - in: path
- *         name: authorId
+ *         name: parentId
  *         required: true
  *         schema:
  *           type: integer
@@ -232,140 +234,117 @@ app.put('/authors/:authorId', (req, res) => {
  *       204:
  *         description: No content
  */
-app.delete('/authors/:authorId', (req, res) => {
-  const authorId = parseInt(req.params.authorId, 10);
-  const idx = authors.findIndex((a) => a.authorId === authorId);
-  if (idx !== -1) authors.splice(idx, 1);
-  authorPapers = authorPapers.filter((l) => l.authorId !== authorId);
+app.delete('/parents/:parentId', (req, res) => {
+  const parentId = parseInt(req.params.parentId, 10);
+  const idx = parents.findIndex((a) => a.parentId === parentId);
+  if (idx !== -1) parents.splice(idx, 1);
+  parentChildren = parentChildren.filter((l) => l.parentId !== parentId);
   res.status(204).end();
 });
 
 /**
  * @swagger
- * /authors/{authorId}:
+ * /parents/{parentId}:
  *   get:
- *     summary: Get an Author by ID (includes their papers)
- *     tags: [Authors]
+ *     summary: Get an parent by ID (includes their children)
+ *     tags: [parents]
  *     parameters:
  *       - in: path
- *         name: authorId
+ *         name: parentId
  *         required: true
  *         schema:
  *           type: integer
  *     responses:
  *       200:
- *         description: Author found
+ *         description: parent found
  *       404:
- *         description: Author not found
+ *         description: parent not found
  */
-app.get('/authors/:authorId', (req, res) => {
-  const authorId = parseInt(req.params.authorId, 10);
-  const author = findAuthor(authorId);
-  if (!author) return res.status(404).end();
+app.get('/parents/:parentId', (req, res) => {
+  const parentId = parseInt(req.params.parentId, 10);
+  const parent = findParent(parentId);
+  if (!parent) return res.status(404).end();
 
-  const authorPaperList = authorPapers
-    .filter((l) => l.authorId === authorId)
-    .map((l) => findPaper(l.paperId))
+  const parentchildList = parentChildren
+    .filter((l) => l.parentId === parentId)
+    .map((l) => findChild(l.childId))
     .filter(Boolean);
 
-  res.status(200).json({ ...author, papers: authorPaperList });
+  res.status(200).json({ ...parent, children: parentchildList });
 });
 
 /**
  * @swagger
- * /authors:
+ * /parents:
  *   get:
- *     summary: Get all Authors ordered by name
- *     tags: [Authors]
+ *     summary: Get all parents ordered by name
+ *     tags: [parents]
  *     responses:
  *       200:
- *         description: List of authors
+ *         description: List of parents
  */
-app.get('/authors', (req, res) => {
-  const sorted = [...authors].sort((a, b) => a.name.localeCompare(b.name));
+app.get('/parents', (req, res) => {
+  const sorted = [...parents].sort((a, b) => a.name.localeCompare(b.name));
   res.status(200).json(sorted);
 });
 
 // ==========================================
-//           PAPER ENDPOINTS
+//           child ENDPOINTS
 // ==========================================
 
 /**
  * @swagger
- * /papers/count:
+ * /children/count:
  *   get:
- *     summary: Count Papers
- *     tags: [Papers]
+ *     summary: Count children
+ *     tags: [children]
  *     responses:
  *       200:
- *         description: Number of papers
+ *         description: Number of children
  */
-app.get('/papers/count', (req, res) => {
-  res.status(200).json(papers.length);
+app.get('/children/count', (req, res) => {
+  res.status(200).json(children.length);
 });
 
 /**
  * @swagger
- * /papers/is-existing:
- *   get:
- *     summary: Check if Paper entryId exists
- *     tags: [Papers]
- *     parameters:
- *       - in: query
- *         name: entryId
- *         schema:
- *           type: string
- *         required: true
- *     responses:
- *       200:
- *         description: Boolean result
- */
-app.get('/papers/is-existing', (req, res) => {
-  const { entryId } = req.query;
-  res.status(200).json(papers.some((p) => p.entryId === entryId));
-});
-
-/**
  * @swagger
- * /papers:
+ * /children:
  *   post:
- *     summary: Add a new Paper
- *     tags: [Papers]
+ *     summary: Add a new child
+ *     tags: [children]
  *     requestBody:
  *       required: true
  *       content:
  *         application/json:
  *           schema:
- *             $ref: '#/components/schemas/Paper'
+ *             $ref: '#/components/schemas/Child'
  *     responses:
  *       201:
- *         description: Paper created
+ *         description: child created
  *       400:
- *         description: Paper already exists
+ *         description: Invalid child data
  */
-app.post('/papers', (req, res) => {
-  const { entryId, title, abstract } = req.body;
+app.post('/children', (req, res) => {
+  const { school, name, course } = req.body;
 
-  if (!entryId || !title) {
-    return res.status(400).send('entryId and title are required.');
-  }
-  if (papers.some((p) => p.entryId === entryId)) {
-    return res.status(400).send(`Paper with entryId ${entryId} already exists.`);
+  if (!name || !school || !course) {
+    return res.status(400).send('name, school and course are required.');
   }
 
-  papers.push({ paperId: nextPaperId++, entryId, title, abstract: abstract ?? null });
+  children.push({ childId: nextChildId++, name, school, course });
   res.status(201).end();
 });
 
 /**
  * @swagger
- * /papers/{paperId}:
+ * /children/{childId}:
  *   put:
- *     summary: Update an existing Paper
- *     tags: [Papers]
+ *     summary: Update an existing child
+ *     tags: [children]
  *     parameters:
  *       - in: path
- *         name: paperId
+ *         name: childId
  *         required: true
  *         schema:
  *           type: integer
@@ -374,42 +353,41 @@ app.post('/papers', (req, res) => {
  *       content:
  *         application/json:
  *           schema:
- *             $ref: '#/components/schemas/Paper'
+ *             $ref: '#/components/schemas/Child'
  *     responses:
  *       200:
- *         description: Paper updated
+ *         description: child updated
  *       400:
  *         description: Bad request
  */
-app.put('/papers/:paperId', (req, res) => {
-  const paperId = parseInt(req.params.paperId, 10);
-  const { paperId: bodyId, entryId, title, abstract } = req.body;
+app.put('/children/:childId', (req, res) => {
+  const childId = parseInt(req.params.childId, 10);
+  const { childId: bodyId, school, name, course } = req.body;
 
-  if (bodyId !== paperId) {
+  if (!name || !school || !course) {
+    return res.status(400).send('name, school and course are required.');
+  }
+  if (bodyId !== childId) {
     return res.status(400).send('Path ID and Body ID do not match.');
   }
-  if (papers.some((p) => p.entryId === entryId && p.paperId !== paperId)) {
-    return res.status(400).send('EntryID already in use by another paper.');
-  }
+  const child = findChild(childId);
+  if (!child) return res.status(400).send('child ID not found.');
 
-  const paper = findPaper(paperId);
-  if (!paper) return res.status(400).send('Paper ID not found.');
-
-  paper.entryId = entryId;
-  paper.title = title;
-  paper.abstract = abstract;
+  child.school = school;
+  child.name = name;
+  child.course = course;
   res.status(200).end();
 });
 
 /**
  * @swagger
- * /papers/{paperId}:
+ * /children/{childId}:
  *   delete:
- *     summary: Delete a Paper
- *     tags: [Papers]
+ *     summary: Delete a child
+ *     tags: [children]
  *     parameters:
  *       - in: path
- *         name: paperId
+ *         name: childId
  *         required: true
  *         schema:
  *           type: integer
@@ -417,131 +395,96 @@ app.put('/papers/:paperId', (req, res) => {
  *       204:
  *         description: No content
  */
-app.delete('/papers/:paperId', (req, res) => {
-  const paperId = parseInt(req.params.paperId, 10);
-  const idx = papers.findIndex((p) => p.paperId === paperId);
-  if (idx !== -1) papers.splice(idx, 1);
-  authorPapers = authorPapers.filter((l) => l.paperId !== paperId);
+app.delete('/children/:childId', (req, res) => {
+  const childId = parseInt(req.params.childId, 10);
+  const idx = children.findIndex((p) => p.childId === childId);
+  if (idx !== -1) children.splice(idx, 1);
+  parentChildren = parentChildren.filter((l) => l.childId !== childId);
   res.status(204).end();
 });
 
 /**
  * @swagger
- * /papers/{paperId}:
+ * /children/{childId}:
  *   get:
- *     summary: Get a Paper by ID (includes its authors)
- *     tags: [Papers]
+ *     summary: Get a child by ID (includes its parents)
+ *     tags: [children]
  *     parameters:
  *       - in: path
- *         name: paperId
+ *         name: childId
  *         required: true
  *         schema:
  *           type: integer
  *     responses:
  *       200:
- *         description: Paper found
+ *         description: child found
  *       404:
- *         description: Paper not found
+ *         description: child not found
  */
-app.get('/papers/:paperId', (req, res) => {
-  const paperId = parseInt(req.params.paperId, 10);
-  const paper = findPaper(paperId);
-  if (!paper) return res.status(404).end();
+app.get('/children/:childId', (req, res) => {
+  const childId = parseInt(req.params.childId, 10);
+  const child = findChild(childId);
+  if (!child) return res.status(404).end();
 
-  const paperAuthors = authorPapers
-    .filter((l) => l.paperId === paperId)
-    .map((l) => findAuthor(l.authorId))
+  const childparents = parentChildren
+    .filter((l) => l.childId === childId)
+    .map((l) => findParent(l.parentId))
     .filter(Boolean);
 
-  res.status(200).json({ ...paper, authors: paperAuthors });
+  res.status(200).json({ ...child, parents: childparents });
 });
 
 /**
  * @swagger
- * /papers:
+ * /children:
  *   get:
- *     summary: Get all Papers ordered by title
- *     tags: [Papers]
+ *     summary: Get all children ordered by name
+ *     tags: [children]
  *     responses:
  *       200:
- *         description: List of papers
+ *         description: List of children
  */
-app.get('/papers', (req, res) => {
-  const sorted = [...papers].sort((a, b) => a.title.localeCompare(b.title));
+app.get('/children', (req, res) => {
+  const sorted = [...children].sort((a, b) => a.name.localeCompare(b.name));
   res.status(200).json(sorted);
 });
 
 /**
- * @swagger
- * /keywords:
- *   get:
- *     summary: Extract keywords from abstracts (stub)
- *     tags: [Papers]
- *     responses:
- *       200:
- *         description: DONE
- */
-app.get('/keywords', (req, res) => {
-  res.status(200).send('DONE!');
-});
-
-/**
- * @swagger
- * /pdf/{paperId}:
- *   get:
- *     summary: Download Paper PDF (stub)
- *     tags: [Papers]
- *     parameters:
- *       - in: path
- *         name: paperId
- *         required: true
- *         schema:
- *           type: integer
- *     responses:
- *       200:
- *         description: Email sent
- */
-app.get('/pdf/:paperId', (req, res) => {
-  const paperId = parseInt(req.params.paperId, 10);
-  const pdfName = `paper-${paperId}.pdf`;
-  res.status(200).send(`Check your email for PDF ${pdfName}`);
-});
-
 // ==========================================
-//   LINK / UNLINK AUTHOR <-> PAPER
+//   LINK / UNLINK parent <-> child
 // ==========================================
 
 function handleLink(req, res) {
-  const authorId = parseInt(req.params.authorId, 10);
-  const paperId = parseInt(req.params.paperId, 10);
-  if (!findAuthor(authorId) || !findPaper(paperId)) {
-    return res.status(404).send('Author or Paper not found.');
+  const parentId = parseInt(req.params.parentId, 10);
+  const childId = parseInt(req.params.childId, 10);
+  if (!findParent(parentId) || !findChild(childId)) {
+    return res.status(404).send('parent or child not found.');
   }
-  link(authorId, paperId);
+  link(parentId, childId);
   res.status(204).end();
 }
 
 function handleUnlink(req, res) {
-  const authorId = parseInt(req.params.authorId, 10);
-  const paperId = parseInt(req.params.paperId, 10);
-  unlink(authorId, paperId);
+  const parentId = parseInt(req.params.parentId, 10);
+  const childId = parseInt(req.params.childId, 10);
+  unlink(parentId, childId);
   res.status(204).end();
 }
 
 /**
  * @swagger
- * /authors/{authorId}/papers/{paperId}:
+ * /parents/{parentId}/children/{childId}:
  *   put:
- *     summary: Link Paper to Author
+ *     summary: Link child to parent
  *     tags: [Links]
  *     parameters:
  *       - in: path
- *         name: authorId
+ *         name: parentId
  *         required: true
  *         schema:
  *           type: integer
  *       - in: path
- *         name: paperId
+ *         name: childId
  *         required: true
  *         schema:
  *           type: integer
@@ -549,18 +492,18 @@ function handleUnlink(req, res) {
  *       204:
  *         description: Linked
  *       404:
- *         description: Author or Paper not found
+ *         description: parent or child not found
  *   delete:
- *     summary: Unlink Paper from Author
+ *     summary: Unlink child from parent
  *     tags: [Links]
  *     parameters:
  *       - in: path
- *         name: authorId
+ *         name: parentId
  *         required: true
  *         schema:
  *           type: integer
  *       - in: path
- *         name: paperId
+ *         name: childId
  *         required: true
  *         schema:
  *           type: integer
@@ -568,23 +511,23 @@ function handleUnlink(req, res) {
  *       204:
  *         description: Unlinked
  */
-app.put('/authors/:authorId/papers/:paperId', handleLink);
-app.delete('/authors/:authorId/papers/:paperId', handleUnlink);
+app.put('/parents/:parentId/children/:childId', handleLink);
+app.delete('/parents/:parentId/children/:childId', handleUnlink);
 
 /**
  * @swagger
- * /papers/{paperId}/authors/{authorId}:
+ * /children/{childId}/parents/{parentId}:
  *   put:
- *     summary: Link Author to Paper
+ *     summary: Link parent to child
  *     tags: [Links]
  *     parameters:
  *       - in: path
- *         name: paperId
+ *         name: childId
  *         required: true
  *         schema:
  *           type: integer
  *       - in: path
- *         name: authorId
+ *         name: parentId
  *         required: true
  *         schema:
  *           type: integer
@@ -592,18 +535,18 @@ app.delete('/authors/:authorId/papers/:paperId', handleUnlink);
  *       204:
  *         description: Linked
  *       404:
- *         description: Author or Paper not found
+ *         description: parent or child not found
  *   delete:
- *     summary: Unlink Author from Paper
+ *     summary: Unlink parent from child
  *     tags: [Links]
  *     parameters:
  *       - in: path
- *         name: paperId
+ *         name: childId
  *         required: true
  *         schema:
  *           type: integer
  *       - in: path
- *         name: authorId
+ *         name: parentId
  *         required: true
  *         schema:
  *           type: integer
@@ -611,8 +554,8 @@ app.delete('/authors/:authorId/papers/:paperId', handleUnlink);
  *       204:
  *         description: Unlinked
  */
-app.put('/papers/:paperId/authors/:authorId', handleLink);
-app.delete('/papers/:paperId/authors/:authorId', handleUnlink);
+app.put('/children/:childId/parents/:parentId', handleLink);
+app.delete('/children/:childId/parents/:parentId', handleUnlink);
 
 // ==========================================
 //             START SERVER
