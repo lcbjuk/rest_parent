@@ -71,7 +71,7 @@ const swaggerOptions = {
       version: '1.0.0',
       description: 'Express in-memory version of the ACME REST API'
     },
-    servers: [{ url: 'https://rest-papers.onrender.com' }],
+    servers: [{ url: 'https://rest-parent.onrender.com' }],
     components: {
       schemas: {
         Parent: {
